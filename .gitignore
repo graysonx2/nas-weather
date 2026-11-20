@@ -1,0 +1,4 @@
+forecast.json
+history.jsonl
+schedule.json
+*.tmp

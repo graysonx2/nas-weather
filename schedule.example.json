@@ -1,0 +1,6 @@
+[
+  {"name": "Nightly backup", "short": "Backup", "hours": [1], "minute": 0, "w": "rain"},
+  {"name": "Media library scan", "short": "Scan", "hours": [6, 12, 18], "minute": 15, "w": "breeze"},
+  {"name": "Container updates", "short": "Updates", "hours": [4], "minute": 30, "w": "fog"},
+  {"name": "Transcode window", "short": "Transcode", "hours": [2, 3, 4, 5], "minute": 0, "w": "wind"}
+]

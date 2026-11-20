@@ -1,0 +1,246 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width,initial-scale=1">
+<title>NAS Weather</title>
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link href="https://fonts.googleapis.com/css2?family=Space+Grotesk:wght@400;600;700&family=JetBrains+Mono:wght@400;600&display=swap" rel="stylesheet">
+<style>
+:root{--bg:#070d1a;--panel:#0d1628cc;--line:#1c2a44;--ink:#e6edf7;--mute:#8a9bb8;--accent:#2e6eea;--deep:#0d4aad;--warn:#f0a63a;--bad:#ef5b5b;--good:#3fc48a}
+*{box-sizing:border-box}
+body{margin:0;min-height:100vh;color:var(--ink);font-family:"Space Grotesk",system-ui,sans-serif;background:var(--bg);overflow-x:hidden}
+.sky{position:fixed;inset:0;z-index:-1;transition:background 1.2s}
+.sky.clear{background:radial-gradient(1200px 600px at 70% -10%,#1e5ad8 0%,#0b2a6b 40%,var(--bg) 80%)}
+.sky.cloudy{background:radial-gradient(1200px 600px at 70% -10%,#3a4f72 0%,#18243c 45%,var(--bg) 80%)}
+.sky.storm{background:radial-gradient(1200px 600px at 70% -10%,#2a3346 0%,#121826 50%,#05080f 85%)}
+.sky.heat{background:radial-gradient(1200px 600px at 70% -10%,#b8571e 0%,#4a1f10 45%,var(--bg) 80%)}
+.wrap{max-width:880px;margin:0 auto;padding:28px 16px 48px}
+.mono{font-family:"JetBrains Mono",monospace}
+.top{display:flex;justify-content:space-between;align-items:baseline;gap:12px;flex-wrap:wrap}
+.top .loc{font-size:13px;letter-spacing:.12em;text-transform:uppercase;color:var(--mute)}
+.top .loc b{color:var(--ink);font-weight:600}
+.hero{display:grid;grid-template-columns:auto 1fr;gap:28px;align-items:center;margin:28px 0 22px}
+.hero svg{width:150px;height:150px}
+.temp{font-size:96px;font-weight:700;line-height:.9;letter-spacing:-.04em}
+.temp small{font-size:32px;color:var(--mute);font-weight:400;vertical-align:top}
+.cond{font-size:24px;margin-top:6px}
+.sub{color:var(--mute);margin-top:6px;font-size:15px}
+.advisory{display:none;border:1px solid #f0a63a66;background:#f0a63a14;border-radius:14px;padding:14px 16px;margin-bottom:18px}
+.advisory.on{display:block}
+.advisory .h{color:var(--warn);font-size:12px;letter-spacing:.14em;text-transform:uppercase}
+.advisory p{margin:6px 0 10px;font-size:15px}
+.bar{height:8px;border-radius:99px;background:#ffffff14;overflow:hidden}
+.bar i{display:block;height:100%;background:linear-gradient(90deg,var(--warn),#ffd48a);border-radius:99px;transition:width .6s}
+.grid{display:grid;grid-template-columns:repeat(4,1fr);gap:12px}
+.card{background:var(--panel);border:1px solid var(--line);border-radius:16px;padding:14px 16px;backdrop-filter:blur(8px)}
+.card .k{font-size:11px;letter-spacing:.14em;text-transform:uppercase;color:var(--mute)}
+.card .v{font-size:28px;font-weight:600;margin-top:6px}
+.card .d{font-size:12px;color:var(--mute);margin-top:4px}
+h2{font-size:12px;letter-spacing:.14em;text-transform:uppercase;color:var(--mute);font-weight:600;margin:28px 0 10px}
+.days{display:grid;grid-template-columns:repeat(4,1fr);gap:12px}
+.day{text-align:center}
+.day svg{width:44px;height:44px;margin:6px auto;display:block}
+.day .name{font-weight:600}
+.day .st{font-size:12px;color:var(--mute)}
+.whatif{margin-top:28px}
+.strip{display:grid;grid-template-columns:repeat(24,minmax(44px,1fr));gap:6px;overflow-x:auto;padding-bottom:6px}
+.hr{background:var(--panel);border:1px solid var(--line);border-radius:12px;padding:8px 4px;text-align:center;font-size:11px;color:var(--mute);position:relative}
+.hr svg{width:28px;height:28px;display:block;margin:4px auto}
+.hr.now{border-color:var(--accent)}
+.hr.raid{box-shadow:inset 0 3px 0 var(--warn)}
+.hr .ev{font-size:10px;color:var(--ink);line-height:1.2;min-height:24px}
+.whatif .card{display:grid;grid-template-columns:1fr 1fr;gap:16px 28px}
+label{display:block;font-size:13px}
+label span{float:right;color:var(--mute)}
+input[type=range]{width:100%;accent-color:var(--accent);margin-top:6px}
+.btns{display:flex;gap:10px;flex-wrap:wrap;grid-column:1/-1}
+button{font:inherit;font-size:13px;color:var(--ink);background:#ffffff0d;border:1px solid var(--line);border-radius:10px;padding:8px 14px;cursor:pointer}
+button:hover{border-color:var(--accent)}
+button.primary{background:var(--accent);border-color:var(--accent)}
+.foot{margin-top:24px;font-size:12px;color:var(--mute);display:flex;justify-content:space-between;flex-wrap:wrap;gap:8px}
+@media (max-width:640px){.hero{grid-template-columns:1fr;gap:8px}.hero svg{width:96px;height:96px}.temp{font-size:72px}.grid,.days{grid-template-columns:repeat(2,1fr)}.whatif .card{grid-template-columns:1fr}}
+@keyframes drift{from{transform:translateX(-4px)}to{transform:translateX(4px)}}
+@keyframes spin{to{transform:rotate(360deg)}}
+@keyframes flash{0%,92%,100%{opacity:0}94%,96%{opacity:1}}
+.drift{animation:drift 4s ease-in-out infinite alternate}
+.rays{transform-origin:50px 50px;animation:spin 30s linear infinite}
+.bolt{animation:flash 5s infinite}
+</style>
+</head>
+<body>
+<div class="sky clear" id="sky"></div>
+<div class="wrap">
+  <div class="top">
+    <div class="loc mono"><a href="/" id="back" hidden style="color:var(--mute);text-decoration:none">&larr; status &nbsp; </a>Forecast for <b id="host">DXP4800PRO</b></div>
+    <div class="loc mono" id="stamp">Snapshot · Nov 19, 10:16 PM</div>
+  </div>
+
+  <div class="hero">
+    <div id="icon"></div>
+    <div>
+      <div class="temp"><span id="t">64</span><small>°C</small></div>
+      <div class="cond" id="cond">Partly cloudy</div>
+      <div class="sub" id="blurb">Feels like a busy afternoon. Light winds out of the transcoder.</div>
+    </div>
+  </div>
+
+  <div class="advisory" id="adv">
+    <div class="h mono">⚠ Weather advisory · RAID reshape in progress</div>
+    <p id="advText">A storm front is moving across the array. Expect slower reads until it passes.</p>
+    <div class="bar"><i id="advBar" style="width:43.5%"></i></div>
+    <div class="d mono" style="font-size:12px;color:var(--mute);margin-top:6px" id="advEta">43.5% · clears in about 47 hours</div>
+  </div>
+
+  <div class="grid">
+    <div class="card"><div class="k mono">Wind</div><div class="v" id="wind">4.6</div><div class="d" id="windD">load avg · breezy</div></div>
+    <div class="card"><div class="k mono">Cloud cover</div><div class="v" id="cloud">67%</div><div class="d" id="cloudD">7.2 of 11 TB used</div></div>
+    <div class="card"><div class="k mono">Ground temp</div><div class="v" id="ground">50°</div><div class="d">NVMe cache</div></div>
+    <div class="card"><div class="k mono">Clear streak</div><div class="v" id="up">13 days</div><div class="d">since last reboot</div></div>
+  </div>
+
+  <h2 class="mono">Next 24 hours</h2>
+  <div class="strip" id="strip"></div>
+  <div class="d mono" id="stripNote" style="font-size:12px;color:var(--mute);margin-top:8px"></div>
+
+  <h2 class="mono">Outlook by drive</h2>
+  <div class="days" id="days"></div>
+
+  <div class="whatif">
+    <h2 class="mono">What if…</h2>
+    <div class="card">
+      <label>Load <span id="lLoad"></span><input type="range" id="sLoad" min="0" max="12" step="0.1"></label>
+      <label>CPU temp <span id="lTemp"></span><input type="range" id="sTemp" min="30" max="100" step="1"></label>
+      <label>Space used <span id="lUsed"></span><input type="range" id="sUsed" min="0" max="100" step="1"></label>
+      <label>Reshape progress <span id="lRaid"></span><input type="range" id="sRaid" min="0" max="100" step="0.5"></label>
+      <div class="btns">
+        <button id="bReal" class="primary">Back to real snapshot</button>
+        <button id="bFail">Fail a drive</button>
+        <button id="bHeat">Heat wave</button>
+        <button id="bCalm">Perfect day</button>
+      </div>
+    </div>
+  </div>
+
+  <div class="foot mono"><span id="src">Sample data</span><a href="https://github.com/graysonx2/nas-weather" style="color:var(--mute)">collect.sh → forecast.json → this page</a></div>
+</div>
+
+<script>
+const SAMPLE={host:"DXP4800PRO",load:4.6,cpu:64,nvme:50,used:67,usedTB:7.2,sizeTB:11,uptime:13,
+  raid:{level:"raid5",progress:43.5,etaMin:2796},
+  drives:[{bay:1,n:"sda",st:"ok",role:"Array"},{bay:2,n:"sdb",st:"ok",role:"Array"},{bay:3,n:"sdc",st:"ok",role:"Array"},{bay:4,n:"sdd",st:"spare",role:"Not in array"}]};
+let REAL=SAMPLE, OUTLOOK=null, s=structuredClone(REAL);
+
+// Turn collect.sh output into the page's shape
+function fromReading(r){
+  const md=(r.raid||[]).find(x=>x.activity)||(r.raid||[])[0]||null;
+  const members=new Set((r.raid||[]).flatMap(x=>x.members));
+  const deg=(r.raid||[]).some(x=>x.degraded);
+  return {host:r.host,load:r.load[0],cpu:r.temps.cpu??0,nvme:r.temps.nvme??"–",
+    used:Math.round(r.volume.used/r.volume.bytes*100),usedTB:r.volume.used/1e12,sizeTB:+(r.volume.bytes/1e12).toFixed(1),
+    uptime:r.uptimeDays,raid:{progress:md&&md.activity?md.progress:100,etaMin:md&&md.etaMin||0},
+    drives:r.drives.sort((a,b)=>a.bay-b.bay).map(d=>({bay:d.bay,n:d.dev,model:d.model,tb:Math.round(d.bytes/1e12),
+      st:members.has(d.dev)?"ok":"spare",role:members.size?"Not in array":"Single disk"})),degraded:deg};
+}
+// Data sources, tried in order: the status dashboard's API, then forecast.json written by collect.sh.
+// With neither, the page runs on SAMPLE data and SAMPLE_SCHEDULE (the public demo).
+const SAMPLE_SCHEDULE=[ // edit or replace with schedule.json: when your machine is busy
+  {name:"Nightly backup",short:"Backup",hours:[1],minute:0,w:"rain"},
+  {name:"Media library scan",short:"Scan",hours:[6,12,18],minute:15,w:"breeze"},
+  {name:"Container updates",short:"Updates",hours:[4],minute:30,w:"fog"},
+  {name:"Transcode window",short:"Transcode",hours:[2,3,4,5],minute:0,w:"wind"},
+];
+function buildOutlook(sched){
+  const out=[], start=new Date(); start.setMinutes(0,0,0);
+  for(let i=0;i<24;i++){
+    const h=new Date(start.getTime()+i*3600e3), hr=h.getHours();
+    const events=sched.filter(e=>e.hours.includes(hr)).map(e=>({name:e.name,short:e.short||e.name,w:e.w||"breeze",
+      at:new Date(h.getTime()+(e.minute||0)*60e3).toLocaleTimeString([], {hour:"numeric",minute:"2-digit"})}));
+    const W={storm:5,rain:4,wind:3,fog:2,breeze:1,clear:0};
+    out.push({t:h.getTime()/1000,label:h.toLocaleTimeString([], {hour:"numeric"}),events,
+      w:events.reduce((a,e)=>W[e.w]>W[a]?e.w:a,"clear")});
+  }
+  return out;
+}
+async function getJSON(u){const r=await fetch(u,{cache:"no-store"}); if(!r.ok) throw 0; return r.json();}
+let LIVE=false;
+async function load(){
+  let reading=null, outlook=null, dash=false;
+  try{ const d=await getJSON("/api/weather"); if(d.reading){reading=d.reading; outlook=d.outlook; dash=true;} }catch(e){}
+  if(!reading){ try{ reading=await getJSON("forecast.json"); }catch(e){} }
+  if(!outlook){ let sch=SAMPLE_SCHEDULE; try{ sch=await getJSON("schedule.json"); }catch(e){} outlook=buildOutlook(sch); }
+  back.hidden=!dash;
+  const live=JSON.stringify(s)===JSON.stringify(REAL);
+  if(reading){ LIVE=true; REAL=fromReading(reading);
+    src.textContent="Live · updated "+new Date(reading.time*1000).toLocaleTimeString([], {hour:"numeric",minute:"2-digit"}); }
+  else src.textContent="Sample data from a real NAS · schedule is made up";
+  OUTLOOK=outlook;
+  if(live) s=structuredClone(REAL);
+  render();
+}
+
+const ICONS={
+ sun:`<svg viewBox="0 0 100 100"><g class="rays" stroke="#ffd36b" stroke-width="5" stroke-linecap="round">${[...Array(8)].map((_,i)=>`<line x1="50" y1="8" x2="50" y2="20" transform="rotate(${i*45} 50 50)"/>`).join("")}</g><circle cx="50" cy="50" r="20" fill="#ffd36b"/></svg>`,
+ partly:`<svg viewBox="0 0 100 100"><circle cx="38" cy="38" r="18" fill="#ffd36b"/><g class="drift"><path d="M30 78h44a16 16 0 0 0 0-32 22 22 0 0 0-42 6 13 13 0 0 0-2 26z" fill="#dfe7f3"/></g></svg>`,
+ cloud:`<svg viewBox="0 0 100 100"><g class="drift"><path d="M24 76h52a18 18 0 0 0 0-36 26 26 0 0 0-50 6 15 15 0 0 0-2 30z" fill="#aab8cf"/></g></svg>`,
+ storm:`<svg viewBox="0 0 100 100"><path d="M24 62h52a18 18 0 0 0 0-36 26 26 0 0 0-50 6 15 15 0 0 0-2 30z" fill="#6b7891"/><path class="bolt" d="M52 60l-10 18h10l-6 16 18-24H54l6-10z" fill="#ffd36b"/><g stroke="#7fa6ff" stroke-width="3" stroke-linecap="round"><line x1="30" y1="70" x2="26" y2="80"/><line x1="70" y1="70" x2="66" y2="80"/></g></svg>`,
+ heat:`<svg viewBox="0 0 100 100"><circle cx="50" cy="50" r="24" fill="#ff8a3d"/><g class="rays" stroke="#ff8a3d" stroke-width="6" stroke-linecap="round">${[...Array(12)].map((_,i)=>`<line x1="50" y1="6" x2="50" y2="16" transform="rotate(${i*30} 50 50)"/>`).join("")}</g></svg>`,
+ fog:`<svg viewBox="0 0 100 100"><g stroke="#8a9bb8" stroke-width="6" stroke-linecap="round"><line x1="20" y1="40" x2="80" y2="40"/><line x1="28" y1="55" x2="72" y2="55"/><line x1="20" y1="70" x2="80" y2="70"/></g></svg>`
+};
+
+function forecast(){
+  const failed=s.drives.some(d=>d.st==="failed");
+  const raidOn=s.raid&&s.raid.progress<100;
+  if(failed||s.degraded) return{icon:"storm",sky:"storm",cond:"Severe storm warning",blurb:"A drive is down. The array is running without a safety net until it's replaced."};
+  if(s.cpu>=85) return{icon:"heat",sky:"heat",cond:"Heat advisory",blurb:"Running hot. Check the fans and give the transcoder a break."};
+  if(s.used>=90) return{icon:"fog",sky:"cloudy",cond:"Dense fog",blurb:"Almost no room left. Visibility for new downloads is near zero."};
+  if(raidOn) return{icon:"storm",sky:"storm",cond:"Thunderstorms",blurb:"A front is moving through the array. Everything works, just slower than usual."};
+  if(s.load>=6) return{icon:"cloud",sky:"cloudy",cond:"Overcast and gusty",blurb:"Heavy workload. Something is transcoding or scanning hard."};
+  if(s.load>=2||s.used>=70) return{icon:"partly",sky:"clear",cond:"Partly cloudy",blurb:"A busy afternoon. Light winds out of the transcoder."};
+  return{icon:"sun",sky:"clear",cond:"Clear skies",blurb:"Quiet and cool. Nothing to report."};
+}
+const windWord=l=>l<1?"calm":l<3?"light breeze":l<6?"breezy":l<9?"gusty":"gale force";
+
+const WICON={storm:"storm",rain:"cloud",wind:"cloud",fog:"fog",breeze:"partly",clear:"sun"};
+function renderStrip(){
+  if(!OUTLOOK){strip.innerHTML="";stripNote.textContent="The hour-by-hour outlook comes from the live feed.";return;}
+  const raidOn=s.raid&&s.raid.progress<100, clearAt=raidOn?Date.now()/1000+s.raid.etaMin*60*(100-s.raid.progress)/Math.max(.1,100-REAL.raid.progress):0;
+  strip.innerHTML=OUTLOOK.map((h,i)=>{
+    const r=raidOn&&h.t<clearAt;
+    const ev=h.events.map(e=>(e.at?e.at+" ":"")+e.name).join("&#10;")+(r?"&#10;RAID reshape running":"");
+    return `<div class="hr${i?"":" now"}${r?" raid":""}" title="${ev||"Nothing scheduled"}">${i?h.label:"Now"}${ICONS[WICON[h.w]]}<div class="ev">${h.events.map(e=>e.short).join("<br>")}</div></div>`}).join("");
+  stripNote.textContent=raidOn?"Amber line = RAID reshape still running in the background. Hover an hour for details.":"Hover an hour for details.";
+}
+function render(){
+  renderStrip(); host.textContent=(s.host||"").replace(/-\d+$/,"");
+  const f=forecast();
+  sky.className="sky "+f.sky; icon.innerHTML=ICONS[f.icon];
+  t.textContent=Math.round(s.cpu); cond.textContent=f.cond; blurb.textContent=f.blurb;
+  wind.textContent=s.load.toFixed(1); windD.textContent="load avg · "+windWord(s.load);
+  cloud.textContent=Math.round(s.used)+"%"; cloudD.textContent=(s.used===REAL.used?REAL.usedTB:s.sizeTB*s.used/100).toFixed(1)+" of "+s.sizeTB+" TB used";
+  ground.textContent=s.nvme+"°"; up.textContent=s.uptime+" days";
+  const raidOn=s.raid&&s.raid.progress<100;
+  adv.classList.toggle("on",raidOn);
+  if(raidOn){const hrs=Math.round(s.raid.etaMin*(100-s.raid.progress)/(100-REAL.raid.progress)/60);
+    advBar.style.width=s.raid.progress+"%"; advEta.textContent=s.raid.progress.toFixed(1)+"% · clears in about "+hrs+" hours";}
+  days.innerHTML=s.drives.map(d=>{const ic=d.st==="failed"?"storm":d.st==="spare"?"partly":raidOn?"cloud":"sun";
+    const st=d.st==="failed"?"Failed":d.st==="spare"?d.role:raidOn?"Reshaping":"Healthy";
+    return `<div class="card day"><div class="name">Bay ${d.bay}</div><div class="st mono" style="font-size:11px;opacity:.7">${d.n}</div>${ICONS[ic]}<div class="st">${st}</div><div class="st mono">${d.tb||12} TB${d.model?" · "+d.model.replace(/^WDC\s+/,""):" WD Red"}</div></div>`}).join("");
+  sLoad.value=s.load;lLoad.textContent=s.load.toFixed(1);
+  sTemp.value=s.cpu;lTemp.textContent=s.cpu+"°C";
+  sUsed.value=s.used;lUsed.textContent=s.used+"%";
+  sRaid.value=s.raid.progress;lRaid.textContent=s.raid.progress.toFixed(1)+"%";
+  stamp.textContent=JSON.stringify(s)===JSON.stringify(REAL)?(LIVE?"Now":"Snapshot · Nov 19"):"What-if mode";
+}
+sLoad.oninput=e=>{s.load=+e.target.value;render()};
+sTemp.oninput=e=>{s.cpu=+e.target.value;render()};
+sUsed.oninput=e=>{s.used=+e.target.value;render()};
+sRaid.oninput=e=>{s.raid.progress=+e.target.value;render()};
+bReal.onclick=()=>{s=structuredClone(REAL);render()};
+bFail.onclick=()=>{s.drives[1].st="failed";render()};
+bHeat.onclick=()=>{s.cpu=92;s.load=9.5;render()};
+bCalm.onclick=()=>{s=structuredClone(REAL);s.load=0.4;s.cpu=41;s.used=45;s.raid.progress=100;render()};
+load(); setInterval(load,60000);
+</script>
+</body>
+</html>
