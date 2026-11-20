@@ -44,12 +44,19 @@ h2{font-size:12px;letter-spacing:.14em;text-transform:uppercase;color:var(--mute
 .day .name{font-weight:600}
 .day .st{font-size:12px;color:var(--mute)}
 .whatif{margin-top:28px}
-.strip{display:grid;grid-template-columns:repeat(24,minmax(44px,1fr));gap:6px;overflow-x:auto;padding-bottom:6px}
-.hr{background:var(--panel);border:1px solid var(--line);border-radius:12px;padding:8px 4px;text-align:center;font-size:11px;color:var(--mute);position:relative}
+.stripwrap{position:relative}
+.strip{display:grid;grid-auto-flow:column;grid-auto-columns:84px;gap:8px;overflow-x:auto;scrollbar-width:none;cursor:grab;user-select:none;-webkit-user-select:none;scroll-behavior:smooth}
+.strip::-webkit-scrollbar{display:none}
+.strip.drag{cursor:grabbing;scroll-behavior:auto}
+.arrow{position:absolute;top:50%;transform:translateY(-50%);width:36px;height:36px;border-radius:50%;border:1px solid var(--line);background:#0d1628f0;color:var(--ink);font-size:18px;line-height:1;cursor:pointer;display:grid;place-items:center;padding:0;z-index:2;transition:opacity .2s}
+.arrow:hover{border-color:var(--accent)}
+.arrow.l{left:-10px}.arrow.r{right:-10px}
+.arrow[hidden]{display:grid;opacity:0;pointer-events:none}
+.hr{background:var(--panel);border:1px solid var(--line);border-radius:12px;padding:8px 6px;text-align:center;font-size:11px;color:var(--mute);position:relative}
 .hr svg{width:28px;height:28px;display:block;margin:4px auto}
 .hr.now{border-color:var(--accent)}
 .hr.raid{box-shadow:inset 0 3px 0 var(--warn)}
-.hr .ev{font-size:10px;color:var(--ink);line-height:1.2;min-height:24px}
+.hr .ev{font-size:11px;color:var(--ink);line-height:1.3;min-height:28px;overflow-wrap:anywhere}
 .whatif .card{display:grid;grid-template-columns:1fr 1fr;gap:16px 28px}
 label{display:block;font-size:13px}
 label span{float:right;color:var(--mute)}
@@ -100,7 +107,11 @@ button.primary{background:var(--accent);border-color:var(--accent)}
   </div>
 
   <h2 class="mono">Next 24 hours</h2>
-  <div class="strip" id="strip"></div>
+  <div class="stripwrap">
+    <button class="arrow l" id="sl" aria-label="Earlier hours" hidden>&lsaquo;</button>
+    <div class="strip" id="strip"></div>
+    <button class="arrow r" id="sr" aria-label="Later hours">&rsaquo;</button>
+  </div>
   <div class="d mono" id="stripNote" style="font-size:12px;color:var(--mute);margin-top:8px"></div>
 
   <h2 class="mono">Outlook by drive</h2>
@@ -209,10 +220,10 @@ function renderStrip(){
     const r=raidOn&&h.t<clearAt;
     const ev=h.events.map(e=>(e.at?e.at+" ":"")+e.name).join("&#10;")+(r?"&#10;RAID reshape running":"");
     return `<div class="hr${i?"":" now"}${r?" raid":""}" title="${ev||"Nothing scheduled"}">${i?h.label:"Now"}${ICONS[WICON[h.w]]}<div class="ev">${h.events.map(e=>e.short).join("<br>")}</div></div>`}).join("");
-  stripNote.textContent=raidOn?"Amber line = RAID reshape still running in the background. Hover an hour for details.":"Hover an hour for details.";
+  stripNote.textContent=raidOn?"Amber line = RAID reshape still running in the background. Drag or use the arrows to see later hours.":"Drag or use the arrows to see later hours.";
 }
 function render(){
-  renderStrip(); host.textContent=(s.host||"").replace(/-\d+$/,"");
+  renderStrip(); if(window.sl) arrows(); host.textContent=(s.host||"").replace(/-\d+$/,"");
   const f=forecast();
   sky.className="sky "+f.sky; icon.innerHTML=ICONS[f.icon];
   t.textContent=Math.round(s.cpu); cond.textContent=f.cond; blurb.textContent=f.blurb;
@@ -241,6 +252,17 @@ bFail.onclick=()=>{s.drives[1].st="failed";render()};
 bHeat.onclick=()=>{s.cpu=92;s.load=9.5;render()};
 bCalm.onclick=()=>{s=structuredClone(REAL);s.load=0.4;s.cpu=41;s.used=45;s.raid.progress=100;render()};
 load(); setInterval(load,60000);
+// Hourly strip: arrows + mouse drag (touch uses native swipe); scrollbar hidden.
+function arrows(){ sl.hidden=strip.scrollLeft<4; sr.hidden=strip.scrollLeft+strip.clientWidth>=strip.scrollWidth-4; }
+sl.onclick=()=>strip.scrollBy({left:-strip.clientWidth*0.8});
+sr.onclick=()=>strip.scrollBy({left:strip.clientWidth*0.8});
+strip.addEventListener("scroll",arrows,{passive:true}); addEventListener("resize",arrows);
+let dx=null, moved=false;
+strip.addEventListener("pointerdown",e=>{ if(e.pointerType!=="mouse") return; dx={x:e.clientX,l:strip.scrollLeft}; moved=false; strip.classList.add("drag"); strip.setPointerCapture(e.pointerId); });
+strip.addEventListener("pointermove",e=>{ if(!dx) return; const d=e.clientX-dx.x; if(Math.abs(d)>3) moved=true; strip.scrollLeft=dx.l-d; });
+const end=()=>{ dx=null; strip.classList.remove("drag"); };
+strip.addEventListener("pointerup",end); strip.addEventListener("pointercancel",end);
+strip.addEventListener("click",e=>{ if(moved){ e.stopPropagation(); e.preventDefault(); } },true);
 </script>
 </body>
 </html>
